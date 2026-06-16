@@ -1,0 +1,10 @@
+# Supply-Chain-Härtung (pnpm 10.16+)
+# Diese Datei macht vue/ zum eigenständigen pnpm-Projekt (kein packages: → nur dieses Paket).
+
+# Pakete erst akzeptieren, wenn ihre Version mind. 7 Tage (10080 Min.) veröffentlicht ist.
+# Frisch kompromittierte Releases werden meist in den ersten Tagen entdeckt und zurückgezogen.
+minimumReleaseAge: 10080
+
+# Keine Lifecycle-/Install-Scripts von Abhängigkeiten ausführen (leere Allowlist).
+# pnpm 10 blockiert das ohnehin per Default; hier explizit und sichtbar.
+onlyBuiltDependencies: []
