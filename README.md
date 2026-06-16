@@ -8,7 +8,9 @@ The simulation core is **render‑free and fully unit‑tested**; the presentati
 is **Vue 3 (runtime‑only) over a hand‑rolled Canvas 2D renderer**. The UI is in
 German (the game's language); all code — identifiers and comments — is in English.
 
-![Screenshot](docs/screenshot.jpg)
+**▶ Live demo: [hexgame-vue.vercel.app](https://hexgame-vue.vercel.app)**
+
+[![Screenshot](docs/screenshot.jpg)](https://hexgame-vue.vercel.app)
 
 ## Highlights
 
