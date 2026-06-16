@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "esbuild src/main.ts --bundle --outfile=main.js --format=esm --sourcemap --servedir=. --watch",
-    "build": "esbuild src/main.ts --bundle --outfile=main.js --format=esm --minify",
+    "build": "esbuild src/main.ts --bundle --outfile=dist/main.js --format=esm --minify && cp index.html dist/",
     "typecheck": "tsc --noEmit",
     "test": "esbuild $(find src -name '*.test.ts') --bundle --platform=node --format=esm --outdir=.test-dist --alias:vitest=./test/vitest-shim.ts && node --test '.test-dist/**/*.js'"
   },
