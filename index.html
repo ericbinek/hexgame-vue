@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>HexGame — Vue</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #0e160e; color: #e8f0e8;
+        font: 14px/1.4 system-ui, sans-serif; overflow: hidden; user-select: none; }
+      #map { display: block; width: 100vw; height: 100vh; }
+
+      /* UI root lets clicks pass through to the map; only the controls catch them. */
+      #ui { position: fixed; inset: 0; pointer-events: none; }
+      #ui .toolbar, #ui .speedbar, #ui .panel { pointer-events: auto; }
+
+      .hud { position: fixed; top: 12px; left: 12px; padding: 8px 12px;
+        background: rgba(0,0,0,.55); border-radius: 8px; }
+      .small { opacity: .75; font-size: 12px; }
+
+      .notice { position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
+        padding: 8px 14px; background: rgba(24,22,30,.9); border: 1px solid #4a4a55;
+        border-radius: 8px; }
+
+      .panel { position: fixed; top: 12px; right: 12px; width: 232px; padding: 10px 12px;
+        background: rgba(0,0,0,.62); border-radius: 8px; }
+      .panel h3 { margin: 0 0 6px; font-size: 14px; }
+      .panel .demolish { margin-top: 8px; width: 100%; justify-content: center;
+        background: rgba(80,28,28,.85); border-color: #7a3535; }
+      .panel .demolish:hover { background: rgba(112,40,40,.92); border-color: #a85050; }
+      .limit-row { display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 12px; }
+      .limit-row span { flex: 1; }
+      .route-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px;
+        font-size: 12px; }
+      .route-row span { flex: 1 1 100%; }
+      .route-row select { flex: 1; }
+      .limit-field { width: 48px; padding: 2px 4px; background: rgba(20,24,30,.85);
+        color: #e8f0e8; border: 1px solid #353b45; border-radius: 4px; font: inherit; font-size: 12px; }
+      .panel select { padding: 2px 4px; background: rgba(20,24,30,.85); color: #e8f0e8;
+        border: 1px solid #353b45; border-radius: 4px; font: inherit; font-size: 12px; }
+      .route-row button { padding: 2px 7px; }
+
+      .townlist { position: fixed; top: 92px; left: 12px; display: flex; flex-direction: column;
+        align-items: flex-start; gap: 4px; pointer-events: auto; }
+      .townlist-items { display: flex; flex-direction: column; gap: 3px;
+        background: rgba(0,0,0,.55); border-radius: 8px; padding: 6px; }
+      .townlist-items button { font-size: 12px; padding: 3px 8px; }
+
+      .toolbar { position: fixed; bottom: 12px; left: 12px; right: 120px;
+        display: flex; flex-wrap: wrap; gap: 4px; }
+      .speedbar { position: fixed; bottom: 12px; right: 12px; display: flex; gap: 4px; }
+
+      button { display: inline-flex; align-items: center; gap: 5px; padding: 5px 9px;
+        background: rgba(20,24,30,.85); color: #e8f0e8; border: 1px solid #353b45;
+        border-radius: 6px; cursor: pointer; font: inherit; font-size: 13px; }
+      button:hover { background: rgba(40,46,56,.92); }
+      button.active { background: #3a6ea5; border-color: #5b9bd5; }
+      .dot { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+    </style>
+  </head>
+  <body>
+    <canvas id="map"></canvas>
+    <div id="ui"></div>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>
