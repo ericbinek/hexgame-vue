@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { BUILDING_TYPES } from '../core/buildings'
 import { Buildings } from '../core/buildings'
+import { Economy } from '../core/economy'
 import { hexTriangles, triToHex } from '../core/hex'
 import { Routes } from '../core/routes'
 import { pointToTri, triCentroid } from '../core/tri'
@@ -31,6 +32,7 @@ function mockCtx() {
     fillText(text: string) { texts.push(text) },
     setTransform() {},
     fillRect() {},
+    strokeRect() {},
     get fills() { return fills },
     get strokes() { return strokes },
     get texts() { return texts },
@@ -173,6 +175,26 @@ describe('drawOverlay planning hints', () => {
     const ctx = mockCtx()
     drawOverlay(ctx as unknown as CanvasRenderingContext2D, new Camera(), store)
     expect(ctx.texts.some((text) => text.includes('Ticks'))).toBe(true)
+  })
+
+  it('draws map status badges for blocked own producers', () => {
+    const world = new World()
+    const buildings = new Buildings(world)
+    buildings.restore(JSON.stringify({
+      v: 1,
+      buildings: [{ id: 1, t: 'sawmill', z: 0, cells: [[0, 0]], inv: { wood: 8 } }],
+    }))
+    const store = testStore({
+      world,
+      buildings,
+      economy: new Economy(buildings),
+      routes: new Routes(buildings),
+    })
+    const ctx = mockCtx()
+    const cam = new Camera()
+    cam.scale = 48
+    drawOverlay(ctx as unknown as CanvasRenderingContext2D, cam, store)
+    expect(ctx.texts).toContain('Voll')
   })
 })
 

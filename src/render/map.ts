@@ -16,6 +16,7 @@ import { terrainAt, triShadeColor } from '../core/terrain';
 import { ROW_H, SIDE, triCentroid, triVerticesFlat, type TriCoord } from '../core/tri';
 import type { World } from '../core/world';
 import { ghostFootprint } from '../game/actions';
+import { buildingMapStatus, type MapStatusKind } from '../game/status';
 import type { Store } from '../game/store';
 import type { Camera } from './camera';
 import { boundaryEdges } from './outline';
@@ -341,6 +342,34 @@ function drawRoutePlanning(ctx: CanvasRenderingContext2D, cam: Camera, store: St
   drawWorldText(ctx, cam, (fromCenter.x + toCenter.x) / 2, (fromCenter.y + toCenter.y) / 2, label, '#d9f99d');
 }
 
+const STATUS_COLORS: Record<MapStatusKind, string> = {
+  maintenance: '#ff8787',
+  workers: '#91c8ff',
+  input: '#ffd166',
+  output: '#f59f00',
+  storage: '#d8b4fe',
+};
+
+function drawStatusBadges(ctx: CanvasRenderingContext2D, cam: Camera, store: Store): void {
+  if (cam.scale < 24) return;
+  for (const b of store.buildings.byId.values()) {
+    if (b.z !== store.zLevel) continue;
+    const status = buildingMapStatus(store, b);
+    if (!status) continue;
+    const c = triCentroid(b.cells[0].x, b.cells[0].y);
+    const color = STATUS_COLORS[status.kind];
+    const w = Math.max(0.78, status.label.length * 0.16 + 0.36);
+    const h = 0.28;
+    const y = c.y + 0.42;
+    ctx.fillStyle = 'rgba(8, 10, 14, 0.82)';
+    ctx.fillRect(c.x - w / 2, y - h / 2, w, h);
+    ctx.lineWidth = 1.5 / cam.scale;
+    ctx.strokeStyle = color;
+    ctx.strokeRect(c.x - w / 2, y - h / 2, w, h);
+    drawWorldText(ctx, cam, c.x, y, status.label, color);
+  }
+}
+
 /**
  * Interaction overlay: in build mode, the preview (green = buildable, red = not)
  * at the cursor, otherwise selection (yellow) and hover (white) highlights. Cf.
@@ -351,6 +380,7 @@ export function drawOverlay(ctx: CanvasRenderingContext2D, cam: Camera, store: S
 
   drawBuildPlanning(ctx, cam, store);
   drawRoutePlanning(ctx, cam, store);
+  drawStatusBadges(ctx, cam, store);
 
   const ghost = ghostFootprint(store);
   if (ghost) {
