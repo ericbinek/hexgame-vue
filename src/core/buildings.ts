@@ -54,6 +54,8 @@ export interface Building {
   inv?: Record<string, number>;
   /** Upper bound of a workshop's output good; once reached → production stops. */
   maxOutput?: number;
+  /** Manual worker target for a workshop. Undefined = automatic assignment. */
+  workerTarget?: number;
   /** Per good of a trading post: min = export reserve, max = collection/storage limit. */
   limits?: Record<string, { min: number; max: number }>;
   /** Owner: undefined = player, otherwise the name of the NPC settlement. */
@@ -137,6 +139,7 @@ export class Buildings {
       cells: b.cells.map((c) => [c.x, c.y]),
       inv: b.inv && Object.keys(b.inv).length > 0 ? b.inv : undefined,
       mo: b.maxOutput,
+      wt: b.workerTarget,
       lim: b.limits && Object.keys(b.limits).length > 0 ? b.limits : undefined,
       o: b.owner,
       m: b.needsMaintenance ? 1 : undefined,
@@ -156,6 +159,7 @@ export class Buildings {
         cells: number[][];
         inv?: Record<string, number>;
         mo?: number;
+        wt?: number;
         lim?: Record<string, { min: number; max: number }>;
         o?: string;
         m?: number;
@@ -170,6 +174,7 @@ export class Buildings {
       const placed = this.placeUnchecked(type, cells, e.z, e.id, e.o);
       if (e.inv) placed.inv = { ...e.inv };
       if (e.mo !== undefined) placed.maxOutput = e.mo;
+      if (e.wt !== undefined) placed.workerTarget = Math.max(0, Math.floor(e.wt));
       if (e.lim) placed.limits = { ...e.lim };
       if (e.m) placed.needsMaintenance = true;
       loaded++;

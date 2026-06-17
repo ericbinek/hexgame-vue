@@ -42,6 +42,13 @@
       .panel .demolish:hover { background: rgba(112,40,40,.92); border-color: #a85050; }
       .limit-row { display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 12px; }
       .limit-row span { flex: 1; }
+      .worker-panel { margin-top: 8px; padding-top: 7px; border-top: 1px solid rgba(232,240,232,.12);
+        font-size: 12px; }
+      .worker-summary, .worker-controls { display: flex; align-items: center; justify-content: space-between;
+        gap: 6px; }
+      .worker-summary { margin-bottom: 5px; color: rgba(232,240,232,.8); }
+      .worker-controls span { flex: 1; text-align: center; }
+      .worker-controls button { width: 28px; height: 24px; padding: 0; justify-content: center; }
       .route-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px;
         font-size: 12px; }
       .route-row span { flex: 1 1 100%; }
@@ -66,6 +73,8 @@
         background: rgba(20,24,30,.85); color: #e8f0e8; border: 1px solid #353b45;
         border-radius: 6px; cursor: pointer; font: inherit; font-size: 13px; }
       button:hover { background: rgba(40,46,56,.92); }
+      button:disabled { cursor: default; opacity: .45; }
+      button:disabled:hover { background: rgba(20,24,30,.85); }
       button.active { background: #3a6ea5; border-color: #5b9bd5; }
       button.guide-target { border-color: #ffe066; box-shadow: 0 0 0 2px rgba(255,224,102,.35); }
       .dot { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }

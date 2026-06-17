@@ -7,6 +7,7 @@ import { World } from './world';
 
 const house = typeById('house')!;
 const shed = typeById('shed')!;
+const sawmill = typeById('sawmill')!;
 
 /** Finds an anchor where building is possible on the ground floor (terrain is deterministic). */
 function findLandAnchor(b: Buildings): TriCoord {
@@ -125,5 +126,18 @@ describe('Serialization', () => {
     expect(b2.byId.size).toBe(2);
     expect(world2.get(anchor.x, anchor.y, 0)?.kind).toBe('Wohnhaus');
     expect(world2.get(anchor.x, anchor.y, 1)?.kind).toBe('Schuppen');
+  });
+
+  it('serialize/restore preserves manual worker targets', () => {
+    const world = new World();
+    const b = new Buildings(world);
+    const anchor = findLandAnchor(b);
+    const placed = b.place(sawmill, footprintAt(anchor), 0)!;
+    placed.workerTarget = 1;
+
+    const world2 = new World();
+    const b2 = new Buildings(world2);
+    expect(b2.restore(b.serialize())).toBe(1);
+    expect([...b2.byId.values()][0].workerTarget).toBe(1);
   });
 });

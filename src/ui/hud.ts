@@ -19,6 +19,7 @@ import {
   setNotice,
   setSpeed,
   setTradingPostLimit,
+  setWorkerTarget,
   startRouteMode,
 } from '../game/operations'
 import { firstBuildGuideStep, loadGuideDismissed, saveGuideDismissed } from '../game/onboarding'
@@ -174,6 +175,42 @@ export function installUi(store: Store, requestRender: () => void): void {
     return h('div', { class: 'panel' }, [
       h('h3', sel.title),
       ...sel.lines.map((line, i) => h('div', { class: i === 0 ? 'small' : undefined }, line)),
+      // Producer: reserve/free workers for this specific building.
+      sel.workers
+        ? h('div', { class: 'worker-panel' }, [
+            h('div', { class: 'worker-summary' }, [
+              h('span', `Arbeiter ${sel.workers.assigned}/${sel.workers.needed}`),
+              h('span', `Frei ${sel.workers.free}`),
+            ]),
+            h('div', { class: 'worker-controls' }, [
+              h(
+                'button',
+                {
+                  title: 'Arbeiter abziehen',
+                  disabled: sel.workers.target <= 0,
+                  onClick: (e: MouseEvent) => {
+                    setWorkerTarget(store, sel.id, sel.workers!.target - 1)
+                    blur(e)
+                  },
+                },
+                '−',
+              ),
+              h('span', `Ziel ${sel.workers.target}/${sel.workers.needed}`),
+              h(
+                'button',
+                {
+                  title: 'Arbeiter zuteilen',
+                  disabled: sel.workers.target >= sel.workers.needed,
+                  onClick: (e: MouseEvent) => {
+                    setWorkerTarget(store, sel.id, sel.workers!.target + 1)
+                    blur(e)
+                  },
+                },
+                '+',
+              ),
+            ]),
+          ])
+        : null,
       // Producer: settable max output (reached → production stops, workers freed).
       sel.recipeOutput
         ? h('div', { class: 'limit-row' }, [

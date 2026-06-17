@@ -172,6 +172,11 @@ export function updateSelection(store: Store): void {
       }))
     : []
 
+  const assignedWorkers = recipe ? store.economy.assignedWorkers(b) : 0
+  const neededWorkers = recipe ? workersNeeded(b) : 0
+  const targetWorkers = recipe ? Math.min(neededWorkers, Math.max(0, b.workerTarget ?? assignedWorkers)) : 0
+  const assignableWorkers = recipe ? store.economy.assignableWorkersOf(b) : 0
+
   store.display.selection = {
     id: b.id,
     title: `${type?.name ?? b.typeId} #${b.id}`,
@@ -180,6 +185,15 @@ export function updateSelection(store: Store): void {
     recipeOutput: own && recipe ? recipe.output : null,
     recipeOutputLabel: recipe ? GOODS[recipe.output] ?? recipe.output : '',
     maxOutput: maxOutputOf(b),
+    workers:
+      own && recipe
+        ? {
+            needed: neededWorkers,
+            assigned: assignedWorkers,
+            target: targetWorkers,
+            free: Math.max(0, assignableWorkers - assignedWorkers),
+          }
+        : null,
     limits,
     carts,
   }
@@ -220,6 +234,16 @@ export function setMaxOutput(store: Store, buildingId: number, value: number): v
   const b = store.buildings.byId.get(buildingId)
   if (!b) return
   b.maxOutput = Math.max(0, Math.floor(value))
+  afterPanelMutation(store)
+}
+
+/** Sets a producer's manual worker target. */
+export function setWorkerTarget(store: Store, buildingId: number, value: number): void {
+  const b = store.buildings.byId.get(buildingId)
+  if (!b || b.owner !== undefined) return
+  const need = workersNeeded(b)
+  if (need <= 0) return
+  b.workerTarget = Math.max(0, Math.min(need, Math.floor(value)))
   afterPanelMutation(store)
 }
 

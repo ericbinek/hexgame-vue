@@ -47,8 +47,16 @@ export interface LimitRow {
   max: number
 }
 
+/** Worker assignment controls for an own producer in the selected-building panel. */
+export interface WorkerRow {
+  needed: number
+  assigned: number
+  target: number
+  free: number
+}
+
 /** Precomputed info panel of a selected building. Vue renders text lines plus, for
- *  own buildings, interactive controls (max output, storage limits, cart freight). */
+ *  own buildings, interactive controls (workers, max output, storage limits, cart freight). */
 export interface SelectionInfo {
   id: number
   title: string
@@ -59,6 +67,8 @@ export interface SelectionInfo {
   recipeOutput: string | null
   recipeOutputLabel: string
   maxOutput: number
+  /** Worker controls of an own producer (null otherwise). */
+  workers: WorkerRow | null
   /** Storage limits of an own trading post (empty otherwise). */
   limits: LimitRow[]
   /** Carts whose endpoint is this trading post (empty otherwise). */

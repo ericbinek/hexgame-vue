@@ -20,7 +20,7 @@ import { World } from './world';
  * Setup via restore(): places without terrain rules — the Economy is meant to
  * be tested in isolation here, not the placement rules.
  */
-function setup(entries: Array<{ t: string; cells: number[][]; inv?: Record<string, number> }>) {
+function setup(entries: Array<{ t: string; cells: number[][]; inv?: Record<string, number>; wt?: number }>) {
   const world = new World();
   const buildings = new Buildings(world);
   buildings.restore(JSON.stringify({ v: 1, buildings: entries.map((e) => ({ ...e, z: 0 })) }));
@@ -121,6 +121,52 @@ describe('Produktion', () => {
     // House provides, but needs none itself → requires 0
     expect(workersNeeded(list[0])).toBe(0);
     expect(economy.assignedWorkers(list[0])).toBe(0);
+  });
+
+  it('manuelles Arbeiter-Ziel priorisiert den gewählten Betrieb', () => {
+    const { economy, list } = setup([
+      { t: 'house', cells: [[0, 0]] },
+      { t: 'house', cells: [[2, 0]] },
+      { t: 'farm', cells: [[4, 0]] },
+      { t: 'mine', cells: [[6, 0]] },
+      { t: 'sawmill', cells: [[8, 0]] },
+    ]);
+
+    economy.tick();
+    expect(economy.isActive(list[2])).toBe(true); // food-chain priority
+    expect(economy.isActive(list[3])).toBe(true); // next closest industry
+    expect(economy.assignedWorkers(list[4])).toBe(0);
+
+    list[4].workerTarget = RECIPES.sawmill.workers;
+    economy.tick();
+    expect(economy.assignedWorkers(list[4])).toBe(RECIPES.sawmill.workers);
+    expect(economy.isActive(list[4])).toBe(true);
+    expect(economy.isActive(list[3])).toBe(false);
+  });
+
+  it('manuelles Teilziel reserviert Arbeiter, ohne Produktion freizuschalten', () => {
+    const { economy, list } = setup([
+      { t: 'house', cells: [[0, 0]] },
+      { t: 'sawmill', cells: [[4, 0]], wt: 1 },
+    ]);
+
+    const report = economy.tick();
+    expect(economy.assignedWorkers(list[1])).toBe(1);
+    expect(economy.isActive(list[1])).toBe(false);
+    expect(report.workersUsed).toBe(1);
+    expect(stockOf(list[1], 'wood')).toBe(0);
+    expect(economy.statusText(list[1])).toBe('wartet auf weitere Arbeiter (1/2)');
+  });
+
+  it('meldet freie lokale Arbeiter für den gewählten Betrieb', () => {
+    const { economy, list } = setup([
+      { t: 'house', cells: [[0, 0]] },
+      { t: 'sawmill', cells: [[4, 0]], inv: { wood: RECIPES.sawmill.buffer } },
+    ]);
+
+    economy.tick();
+    expect(economy.assignedWorkers(list[1])).toBe(0);
+    expect(economy.assignableWorkersOf(list[1])).toBe(2);
   });
 
   it('voller Puffer stoppt die Produktion', () => {

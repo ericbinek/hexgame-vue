@@ -238,6 +238,10 @@ export function payBuildCost(
 export class Economy {
   tickCount = 0;
   private active = new Set<number>();
+  /** Worker count assigned in the last tick, per operation. */
+  private assigned = new Map<number, number>();
+  /** Workers the operation can claim from its local houses: assigned + still idle. */
+  private assignable = new Map<number, number>();
   /** Average commute distance (hex) of the workers assigned in the last tick, per operation. */
   private commute = new Map<number, number>();
 
@@ -249,12 +253,21 @@ export class Economy {
   }
 
   /**
-   * Workers actually assigned to an operation in the last tick. The assignment
-   * is binary: an active operation has all the workers it needs, an inactive one
-   * none. Non-operations (house/trading post) neither provide nor need any → 0.
+   * Workers actually assigned to an operation in the last tick. A manually set
+   * worker target can reserve a partial crew; production still needs the full
+   * recipe crew. Non-operations neither provide nor need any → 0.
    */
   assignedWorkers(b: Building): number {
-    return this.isActive(b) ? workersNeeded(b) : 0;
+    return this.assigned.get(b.id) ?? 0;
+  }
+
+  /**
+   * Workers currently reachable by this operation: already assigned here plus
+   * still-idle local workers. Used by the selected-building HUD controls.
+   */
+  assignableWorkersOf(b: Building): number {
+    if (!RECIPES[b.typeId]) return 0;
+    return this.assignable.get(b.id) ?? this.localWorkerCapacityOf(b);
   }
 
   /**
@@ -278,6 +291,21 @@ export class Economy {
 
   private sorted(): Building[] {
     return [...this.buildings.byId.values()].sort((a, b) => a.id - b.id);
+  }
+
+  private localWorkerCapacityOf(p: Building): number {
+    const members = this.sorted().filter((b) => b.owner === p.owner);
+    const producers = members.filter((b) => RECIPES[b.typeId]);
+    const houses = members.filter((b) => b.typeId === 'house');
+    const ph = buildingHex(p);
+    let total = 0;
+    for (const h of houses) {
+      if (hexDistance(ph, buildingHex(h)) > ECON.workerRadius) continue;
+      const bound = producers.find((q) => q.cells[0].x === h.cells[0].x && q.cells[0].y === h.cells[0].y);
+      if (bound && bound.id !== p.id) continue;
+      total += workersOf(h);
+    }
+    return total;
   }
 
   /** Total stock in the trading posts of an owner (default: player). */
@@ -324,6 +352,8 @@ export class Economy {
   tick(): EconomyReport {
     this.tickCount++;
     this.active.clear();
+    this.assigned.clear();
+    this.assignable.clear();
     this.commute.clear();
     const groups = new Map<string | undefined, Building[]>();
     for (const b of this.sorted()) {
@@ -393,9 +423,10 @@ export class Economy {
     // 1) Assign workers locally. Each operation draws its workers from houses
     //    within the workerRadius, in ascending order of distance — the average
     //    commute distance later determines the unit count (travel time as an economic factor).
-    //    Order of operations: first the food chain (grain/flour/bread/beer), then
-    //    industry (otherwise the bakery starves); within that by proximity to the
-    //    nearest house (closer first → on scarcity the well-located operation wins).
+    //    Order of operations: first manually requested crews, then the food chain
+    //    (grain/flour/bread/beer), then industry (otherwise the bakery starves);
+    //    within that by proximity to the nearest house (closer first → on scarcity
+    //    the well-located operation wins).
     //    A satisfied operation (max output) and one due for maintenance claim nothing.
     //    Column binding: a house in the same (x,y) column as an operation
     //    (typically built directly above it) is firmly assigned to it. Its workers
@@ -419,15 +450,20 @@ export class Economy {
       nearestHouse.set(p.id, min);
     }
     const byPriority = [...producers].sort((a, b) => {
+      const ma = (a.workerTarget ?? -1) > 0 ? 0 : 1;
+      const mb = (b.workerTarget ?? -1) > 0 ? 0 : 1;
       const fa = FOOD_CHAIN.has(RECIPES[a.typeId].output) ? 0 : 1;
       const fb = FOOD_CHAIN.has(RECIPES[b.typeId].output) ? 0 : 1;
-      return fa - fb || nearestHouse.get(a.id)! - nearestHouse.get(b.id)! || a.id - b.id;
+      return ma - mb || fa - fb || nearestHouse.get(a.id)! - nearestHouse.get(b.id)! || a.id - b.id;
     });
     let workersUsed = 0;
     for (const p of byPriority) {
       if (p.needsMaintenance) continue;
       if (stockOf(p, RECIPES[p.typeId].output) >= maxOutputOf(p)) continue;
-      const need = RECIPES[p.typeId].workers;
+      const recipeNeed = RECIPES[p.typeId].workers;
+      const target = p.workerTarget ?? recipeNeed;
+      const need = Math.min(recipeNeed, Math.max(0, Math.floor(target)));
+      if (need <= 0) continue;
       const ph = buildingHex(p);
       const candidates = houses
         .map((h) => ({ h, d: hexDistance(ph, buildingHex(h)) }))
@@ -455,9 +491,22 @@ export class Economy {
       }
       if (dists.length < need) continue; // not enough workers in range
       for (const hid of fromHouse) rest.set(hid, rest.get(hid)! - 1);
-      this.active.add(p.id);
+      this.assigned.set(p.id, dists.length);
+      if (dists.length >= recipeNeed) this.active.add(p.id);
       this.commute.set(p.id, dists.reduce((s, d) => s + d, 0) / dists.length);
-      workersUsed += need;
+      workersUsed += dists.length;
+    }
+    for (const p of producers) {
+      const ph = buildingHex(p);
+      let available = this.assignedWorkers(p);
+      for (const h of houses) {
+        const free = rest.get(h.id) ?? 0;
+        if (free <= 0 || hexDistance(ph, buildingHex(h)) > ECON.workerRadius) continue;
+        const on = bound.get(h.id);
+        if (on !== undefined && on !== p.id) continue;
+        available += free;
+      }
+      this.assignable.set(p.id, available);
     }
 
     // 2) Acquire input goods: enough for this tick's planned unit count
@@ -543,6 +592,12 @@ export class Economy {
     const out = stockOf(b, recipe.output);
     const max = maxOutputOf(b);
     if (out >= max) return `Max erreicht (${out}/${max}) — wartet aufs Kontor`;
+    if (b.workerTarget === 0) return `pausiert — Arbeiter-Ziel 0/${workersNeeded(b)}`;
+    const assigned = this.assignedWorkers(b);
+    const needed = workersNeeded(b);
+    if (this.tickCount > 0 && assigned > 0 && assigned < needed) {
+      return `wartet auf weitere Arbeiter (${assigned}/${needed})`;
+    }
     if (this.tickCount > 0 && !this.isActive(b)) {
       return `steht still — keine Arbeiter in Reichweite (${ECON.workerRadius} Hexfelder)`;
     }
