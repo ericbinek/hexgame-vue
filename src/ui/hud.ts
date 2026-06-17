@@ -24,6 +24,16 @@ import type { Store } from '../game/store'
 
 const SPEEDS = [0, 1, 2, 4] as const
 
+const HELP_FLAG = 'hexgame-help-seen'
+
+// Control legend for the welcome/help box. UI strings are German (the game's
+// language); the wording matches the actual input handling in main.ts.
+const CONTROLS: ReadonlyArray<readonly [string, string, string]> = [
+  ['🖱️', 'Maus', 'Ziehen bewegt die Karte · Mausrad zoomt · Klick baut/wählt · Rechtsklick bricht den Bau-Modus ab'],
+  ['👆', 'Touch', 'Wischen bewegt · zwei Finger zoomen · Tippen baut/wählt'],
+  ['⌨️', 'Tasten', 'Leertaste pausiert · 1 / 2 / 3 Tempo · Q / E wechselt die Ebene · Esc bricht ab'],
+]
+
 function cssColor(n: number): string {
   return '#' + (n >>> 0).toString(16).padStart(6, '0')
 }
@@ -31,6 +41,47 @@ function cssColor(n: number): string {
 export function installUi(store: Store, requestRender: () => void): void {
   const a = store.display
   const townsOpen = ref(false)
+
+  // Open on the very first visit, afterwards only via the "?" button.
+  let seen = false
+  try {
+    seen = localStorage.getItem(HELP_FLAG) === '1'
+  } catch {
+    // localStorage blocked (private mode) — just show the help.
+  }
+  const helpOpen = ref(!seen)
+  const closeHelp = (): void => {
+    helpOpen.value = false
+    try {
+      localStorage.setItem(HELP_FLAG, '1')
+    } catch {
+      // ignore
+    }
+  }
+
+  const helpBox = (): VNode =>
+    h('div', { class: 'help-bg', onClick: closeHelp }, [
+      h('div', { class: 'help', onClick: (e: MouseEvent) => e.stopPropagation() }, [
+        h('h2', 'HexGame — Vue-Version'),
+        h(
+          'p',
+          { class: 'small' },
+          'Patrizier-inspirierte Wirtschaftssimulation auf einer Hex-Karte. Baue Höfe, Mühlen und Kontore, beliefere die Siedlungen und lass sie wachsen.',
+        ),
+        ...CONTROLS.map(([icon, title, text]) =>
+          h('div', { class: 'help-row' }, [
+            h('span', { class: 'help-icon' }, icon),
+            h('span', [h('b', title + ': '), text]),
+          ]),
+        ),
+        h(
+          'p',
+          { class: 'small', style: 'margin-top:10px' },
+          'Bauen: Gebäude in der unteren Leiste wählen, dann auf die Karte tippen. Abreißen: eigenes Gebäude auswählen → „Abreißen“ in der Infotafel.',
+        ),
+        h('button', { class: 'help-go', onClick: closeHelp }, 'Los geht’s'),
+      ]),
+    ])
 
   const blur = (e: Event) => (e.currentTarget as HTMLElement).blur()
 
@@ -161,7 +212,14 @@ export function installUi(store: Store, requestRender: () => void): void {
         h('div', [
           // HUD — top left
           h('div', { class: 'hud' }, [
-            h('div', { style: 'font-weight:600' }, 'HexGame — Vue-Version'),
+            h('div', { class: 'hud-title' }, [
+              h('span', { style: 'font-weight:600' }, 'HexGame — Vue-Version'),
+              h(
+                'button',
+                { class: 'help-btn', title: 'Steuerung anzeigen', onClick: () => (helpOpen.value = true) },
+                '?',
+              ),
+            ]),
             h(
               'div',
               { style: 'margin-top:4px' },
@@ -208,6 +266,8 @@ export function installUi(store: Store, requestRender: () => void): void {
               ),
             ),
           ),
+          // Welcome / help overlay
+          helpOpen.value ? helpBox() : null,
         ])
     },
   }

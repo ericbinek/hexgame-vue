@@ -55,6 +55,23 @@
       button:hover { background: rgba(40,46,56,.92); }
       button.active { background: #3a6ea5; border-color: #5b9bd5; }
       .dot { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+
+      .hud-title { display: flex; align-items: center; gap: 8px; }
+      .help-btn { padding: 0; width: 20px; height: 20px; justify-content: center;
+        border-radius: 50%; font-size: 12px; line-height: 1; opacity: .8; }
+
+      /* Welcome / help overlay — centered, dimmed backdrop. */
+      .help-bg { position: fixed; inset: 0; pointer-events: auto; display: flex;
+        align-items: center; justify-content: center; padding: 16px;
+        background: rgba(6,10,8,.6); backdrop-filter: blur(2px); }
+      .help { max-width: 420px; padding: 20px 22px; background: #141c16;
+        border: 1px solid #2c3a2e; border-radius: 12px; box-shadow: 0 12px 40px rgba(0,0,0,.5); }
+      .help h2 { margin: 0 0 8px; font-size: 18px; }
+      .help p { margin: 0 0 14px; }
+      .help-row { display: flex; gap: 10px; align-items: baseline; margin: 8px 0; }
+      .help-icon { flex: none; width: 22px; text-align: center; }
+      .help-go { margin-top: 16px; width: 100%; justify-content: center; padding: 9px;
+        background: #3a6ea5; border-color: #5b9bd5; font-size: 14px; }
     </style>
   </head>
   <body>
