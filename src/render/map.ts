@@ -7,16 +7,12 @@
  * of prebuilt Pixi graphics, it draws per frame (only when the camera has
  * moved). Chunk caching is the later optimization, if needed.
  */
-import { RECIPES, ECON, GOODS } from '../core/economy';
-import type { Buildings } from '../core/buildings';
-import { hexCenter, hexDistance, hexPolygonFlat, hexTriangles, triToHex, type HexCoord } from '../core/hex';
-import { settlementTradingPosts } from '../core/npc';
-import { ROUTE } from '../core/routes';
+import { RECIPES, ECON } from '../core/economy';
+import { hexPolygonFlat, hexTriangles, triToHex, type HexCoord } from '../core/hex';
 import { terrainAt, triShadeColor } from '../core/terrain';
 import { ROW_H, SIDE, triCentroid, triVerticesFlat, type TriCoord } from '../core/tri';
 import type { World } from '../core/world';
 import { ghostFootprint } from '../game/actions';
-import { buildingMapStatus, type MapStatusKind } from '../game/status';
 import type { Store } from '../game/store';
 import type { Camera } from './camera';
 import { boundaryEdges } from './outline';
@@ -85,25 +81,6 @@ function drawHexRadius(
   ctx.lineWidth = line;
   ctx.strokeStyle = stroke;
   ctx.stroke();
-}
-
-function drawWorldText(
-  ctx: CanvasRenderingContext2D,
-  cam: Camera,
-  x: number,
-  y: number,
-  text: string,
-  fill: string,
-): void {
-  const size = 12 / cam.scale;
-  ctx.font = `${size}px ui-monospace, Menlo, monospace`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.lineWidth = 3 / cam.scale;
-  ctx.strokeStyle = 'rgba(8, 10, 14, 0.85)';
-  ctx.strokeText(text, x, y);
-  ctx.fillStyle = fill;
-  ctx.fillText(text, x, y);
 }
 
 export function drawMap(ctx: CanvasRenderingContext2D, cam: Camera): void {
@@ -227,33 +204,6 @@ export function drawObjects(
   }
 }
 
-/**
- * Settlement names above their trading posts — drawn in **screen space**, so
- * reset the canvas transform to device pixels before the call
- * (ctx.setTransform(dpr,0,0,dpr,0,0)). worldToScreen returns CSS pixels.
- */
-export function drawLabels(
-  ctx: CanvasRenderingContext2D,
-  cam: Camera,
-  buildings: Buildings,
-): void {
-  ctx.font = '13px ui-monospace, Menlo, monospace';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'bottom';
-  ctx.lineWidth = 3;
-  for (const s of settlementTradingPosts(buildings)) {
-    const k = buildings.byId.get(s.tradingPostId);
-    if (!k) continue;
-    const c = triCentroid(k.cells[0].x, k.cells[0].y);
-    const p = cam.worldToScreen(c.x, c.y);
-    const y = p.y - ROW_H * cam.scale - 4;
-    ctx.strokeStyle = '#0a0e14';
-    ctx.strokeText(s.name, p.x, y);
-    ctx.fillStyle = '#ffe9a8';
-    ctx.fillText(s.name, p.x, y);
-  }
-}
-
 function highlight(
   ctx: CanvasRenderingContext2D,
   t: TriCoord,
@@ -290,8 +240,6 @@ function drawBuildPlanning(ctx: CanvasRenderingContext2D, cam: Camera, store: St
       'rgba(85, 166, 255, 0.28)',
       line,
     );
-    const c = hexCenter(hex.q, hex.r);
-    drawWorldText(ctx, cam, c.x, c.y + ROW_H * (ECON.tradingPostRadius + 1.4), 'Kontor-Reichweite', '#9dccff');
   } else if (RECIPES[store.mode.type.id]) {
     drawHexRadius(
       ctx,
@@ -301,8 +249,6 @@ function drawBuildPlanning(ctx: CanvasRenderingContext2D, cam: Camera, store: St
       'rgba(255, 209, 102, 0.34)',
       line,
     );
-    const c = hexCenter(hex.q, hex.r);
-    drawWorldText(ctx, cam, c.x, c.y + ROW_H * (ECON.workerRadius + 1.3), 'Arbeiter-Reichweite', '#ffd166');
   }
 }
 
@@ -334,12 +280,6 @@ function drawRoutePlanning(ctx: CanvasRenderingContext2D, cam: Camera, store: St
   ctx.strokeStyle = target?.typeId === 'tradingPost' ? 'rgba(105, 219, 124, 0.9)' : 'rgba(255, 209, 102, 0.7)';
   ctx.stroke();
 
-  const a = triToHex(from.cells[0].x, from.cells[0].y);
-  const b = triToHex(toCell.x, toCell.y);
-  const distance = hexDistance(a, b);
-  const ticks = Math.max(1, Math.ceil(distance / ROUTE.hexPerTick));
-  const label = target?.typeId === 'tradingPost' ? `${distance} Hex · ${ticks} Ticks` : `${distance} Hex`;
-  drawWorldText(ctx, cam, (fromCenter.x + toCenter.x) / 2, (fromCenter.y + toCenter.y) / 2, label, '#d9f99d');
 }
 
 function lerp(a: number, b: number, t: number): number {
@@ -377,69 +317,6 @@ function drawActiveRoutes(ctx: CanvasRenderingContext2D, cam: Camera, store: Sto
     ctx.strokeStyle = cart.load > 0 ? '#0a0e14' : (foreign ? '#ffd166' : '#91c8ff');
     ctx.strokeRect(x - size / 2, y - size / 2, size, size);
 
-    if (cam.scale >= 24) {
-      const dir = returning ? '←' : outbound ? '→' : '•';
-      const loadText = cart.load > 0 ? `${cart.load} ${GOODS[cart.loadGood ?? cart.outGood] ?? cart.loadGood ?? cart.outGood}` : 'leer';
-      drawWorldText(ctx, cam, x, y + 0.36, `${dir} ${loadText}`, cart.load > 0 ? '#fff4bf' : '#cbd5e1');
-    }
-  }
-}
-
-const STATUS_COLORS: Record<MapStatusKind, string> = {
-  maintenance: '#ff8787',
-  workers: '#91c8ff',
-  input: '#ffd166',
-  output: '#f59f00',
-  storage: '#d8b4fe',
-};
-
-const BUILDING_MARKS: Record<string, string> = {
-  tradingPost: 'K',
-  house: 'W',
-  sawmill: 'S',
-  farm: 'H',
-  mill: 'M',
-  brewery: 'Br',
-  bakery: 'Bk',
-  mine: 'Mi',
-  smithy: 'Sm',
-  shed: 'L',
-};
-
-function drawBuildingTypeMarkers(ctx: CanvasRenderingContext2D, cam: Camera, store: Store): void {
-  if (cam.scale < 36) return;
-  for (const b of store.buildings.byId.values()) {
-    if (b.z !== store.zLevel) continue;
-    const mark = BUILDING_MARKS[b.typeId];
-    if (!mark) continue;
-    const c = triCentroid(b.cells[0].x, b.cells[0].y);
-    const s = Math.max(0.2, mark.length * 0.11 + 0.18);
-    ctx.fillStyle = b.owner === undefined ? 'rgba(8, 10, 14, 0.58)' : 'rgba(8, 10, 14, 0.42)';
-    ctx.fillRect(c.x - s / 2, c.y - s / 2, s, s);
-    ctx.lineWidth = 1 / cam.scale;
-    ctx.strokeStyle = b.owner === undefined ? 'rgba(255, 255, 255, 0.45)' : 'rgba(255, 233, 168, 0.45)';
-    ctx.strokeRect(c.x - s / 2, c.y - s / 2, s, s);
-    drawWorldText(ctx, cam, c.x, c.y, mark, b.owner === undefined ? '#f8fafc' : '#ffe9a8');
-  }
-}
-
-function drawStatusBadges(ctx: CanvasRenderingContext2D, cam: Camera, store: Store): void {
-  if (cam.scale < 24) return;
-  for (const b of store.buildings.byId.values()) {
-    if (b.z !== store.zLevel) continue;
-    const status = buildingMapStatus(store, b);
-    if (!status) continue;
-    const c = triCentroid(b.cells[0].x, b.cells[0].y);
-    const color = STATUS_COLORS[status.kind];
-    const w = Math.max(0.78, status.label.length * 0.16 + 0.36);
-    const h = 0.28;
-    const y = c.y + 0.42;
-    ctx.fillStyle = 'rgba(8, 10, 14, 0.82)';
-    ctx.fillRect(c.x - w / 2, y - h / 2, w, h);
-    ctx.lineWidth = 1.5 / cam.scale;
-    ctx.strokeStyle = color;
-    ctx.strokeRect(c.x - w / 2, y - h / 2, w, h);
-    drawWorldText(ctx, cam, c.x, y, status.label, color);
   }
 }
 
@@ -454,8 +331,6 @@ export function drawOverlay(ctx: CanvasRenderingContext2D, cam: Camera, store: S
   drawBuildPlanning(ctx, cam, store);
   drawRoutePlanning(ctx, cam, store);
   drawActiveRoutes(ctx, cam, store);
-  drawBuildingTypeMarkers(ctx, cam, store);
-  drawStatusBadges(ctx, cam, store);
 
   const ghost = ghostFootprint(store);
   if (ghost) {
@@ -472,10 +347,6 @@ export function drawOverlay(ctx: CanvasRenderingContext2D, cam: Camera, store: S
     ctx.lineWidth = line;
     ctx.strokeStyle = ghost.ok ? '#69db7c' : '#ff6b6b';
     ctx.stroke();
-    if (!ghost.ok && ghost.reason) {
-      const c = triCentroid(ghost.cells[0].x, ghost.cells[0].y);
-      drawWorldText(ctx, cam, c.x, c.y + 0.55, ghost.reason, '#ffb4b4');
-    }
     return;
   }
 

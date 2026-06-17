@@ -6,7 +6,7 @@ import { pointToTri, triCentroid, type TriCoord } from './core/tri'
 import { save, discardState } from './game/persistence'
 import { updateSelection, clickMap, setMode, setNotice, setSpeed } from './game/operations'
 import { createStore, tickOnce } from './game/store'
-import { drawMap, drawLabels, drawObjects, drawOverlay } from './render/map'
+import { drawMap, drawObjects, drawOverlay } from './render/map'
 import { RenderProfiler } from './render/profile'
 import { installUi } from './ui/hud'
 
@@ -53,8 +53,6 @@ function render() {
     renderProfiler.measure('terrain', () => drawMap(ctx, cam))
     renderProfiler.measure('objects', () => drawObjects(ctx, cam, store.world, store.zLevel))
     renderProfiler.measure('overlay', () => drawOverlay(ctx, cam, store))
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0) // screen space for text
-    renderProfiler.measure('labels', () => drawLabels(ctx, cam, store.buildings))
   })
 }
 

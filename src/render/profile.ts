@@ -1,4 +1,4 @@
-export type RenderSection = 'terrain' | 'objects' | 'overlay' | 'labels' | 'total';
+export type RenderSection = 'terrain' | 'objects' | 'overlay' | 'total';
 
 export interface RenderSectionStats {
   count: number;
@@ -9,7 +9,7 @@ export interface RenderSectionStats {
 
 export type RenderProfileSummary = Record<RenderSection, RenderSectionStats>;
 
-const SECTIONS: RenderSection[] = ['terrain', 'objects', 'overlay', 'labels', 'total'];
+const SECTIONS: RenderSection[] = ['terrain', 'objects', 'overlay', 'total'];
 
 function emptyStats(): RenderSectionStats {
   return { count: 0, lastMs: 0, avgMs: 0, maxMs: 0 };

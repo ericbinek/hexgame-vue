@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { BUILDING_TYPES } from '../core/buildings'
 import { Buildings } from '../core/buildings'
-import { Economy } from '../core/economy'
 import { hexTriangles, triToHex } from '../core/hex'
 import { Routes } from '../core/routes'
 import { pointToTri, triCentroid } from '../core/tri'
@@ -142,7 +141,7 @@ describe('drawOverlay planning hints', () => {
     const ctx = mockCtx()
     drawOverlay(ctx as unknown as CanvasRenderingContext2D, cam, store)
     expect(ctx.fills).toBeGreaterThan(1) // radius fill + build ghost
-    expect(ctx.texts).toContain('Kontor-Reichweite')
+    expect(ctx.texts).toEqual([])
   })
 
   it('shows invalid build reasons on the build preview', () => {
@@ -152,7 +151,8 @@ describe('drawOverlay planning hints', () => {
     const store = testStore({ zLevel: 1, mode: { kind: 'build', type }, hover: { x: 0, y: 0 } })
     const ctx = mockCtx()
     drawOverlay(ctx as unknown as CanvasRenderingContext2D, cam, store)
-    expect(ctx.texts).toContain('keine tragende Ebene darunter')
+    expect(ctx.fills).toBeGreaterThan(0)
+    expect(ctx.texts).toEqual([])
   })
 
   it('previews route distance and travel ticks while choosing a cart target', () => {
@@ -174,56 +174,11 @@ describe('drawOverlay planning hints', () => {
     })
     const ctx = mockCtx()
     drawOverlay(ctx as unknown as CanvasRenderingContext2D, new Camera(), store)
-    expect(ctx.texts.some((text) => text.includes('Ticks'))).toBe(true)
+    expect(ctx.strokes).toBeGreaterThan(0)
+    expect(ctx.texts).toEqual([])
   })
 
-  it('draws map status badges for blocked own producers', () => {
-    const world = new World()
-    const buildings = new Buildings(world)
-    buildings.restore(JSON.stringify({
-      v: 1,
-      buildings: [{ id: 1, t: 'sawmill', z: 0, cells: [[0, 0]], inv: { wood: 8 } }],
-    }))
-    const store = testStore({
-      world,
-      buildings,
-      economy: new Economy(buildings),
-      routes: new Routes(buildings),
-    })
-    const ctx = mockCtx()
-    const cam = new Camera()
-    cam.scale = 48
-    drawOverlay(ctx as unknown as CanvasRenderingContext2D, cam, store)
-    expect(ctx.texts).toContain('Voll')
-  })
-
-  it('draws building type markers only at readable zoom levels', () => {
-    const world = new World()
-    const buildings = new Buildings(world)
-    buildings.restore(JSON.stringify({
-      v: 1,
-      buildings: [{ id: 1, t: 'tradingPost', z: 0, cells: [[0, 0]] }],
-    }))
-    const store = testStore({
-      world,
-      buildings,
-      economy: new Economy(buildings),
-      routes: new Routes(buildings),
-    })
-    const far = mockCtx()
-    const farCam = new Camera()
-    farCam.scale = 20
-    drawOverlay(far as unknown as CanvasRenderingContext2D, farCam, store)
-    expect(far.texts).not.toContain('K')
-
-    const readable = mockCtx()
-    const readableCam = new Camera()
-    readableCam.scale = 36
-    drawOverlay(readable as unknown as CanvasRenderingContext2D, readableCam, store)
-    expect(readable.texts).toContain('K')
-  })
-
-  it('draws active route cart labels with load and direction', () => {
+  it('draws active route visuals without cart text labels', () => {
     const world = new World()
     const buildings = new Buildings(world)
     buildings.restore(JSON.stringify({
@@ -240,14 +195,14 @@ describe('drawOverlay planning hints', () => {
     const store = testStore({
       world,
       buildings,
-      economy: new Economy(buildings),
       routes,
     })
     const ctx = mockCtx()
     const cam = new Camera()
     cam.scale = 48
     drawOverlay(ctx as unknown as CanvasRenderingContext2D, cam, store)
-    expect(ctx.texts).toContain('→ 8 Bier')
+    expect(ctx.strokes).toBeGreaterThan(0)
+    expect(ctx.texts).toEqual([])
   })
 })
 
