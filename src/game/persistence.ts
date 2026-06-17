@@ -10,6 +10,7 @@
 import { Buildings } from '../core/buildings'
 import { Routes, type Treasury } from '../core/routes'
 import { World } from '../core/world'
+import { GUIDE_KEY } from './onboarding'
 import { OBJECTIVES_KEY } from './objectives'
 
 const BUILDINGS_KEY = 'hexgame-vue-buildings-v1'
@@ -116,4 +117,5 @@ export function discardState(): void {
   localStorage.removeItem(ROUTES_KEY)
   localStorage.removeItem(MONEY_KEY)
   localStorage.removeItem(OBJECTIVES_KEY)
+  localStorage.removeItem(GUIDE_KEY)
 }

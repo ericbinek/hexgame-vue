@@ -21,6 +21,7 @@ import {
   setTradingPostLimit,
   startRouteMode,
 } from '../game/operations'
+import { firstBuildGuideStep, loadGuideDismissed, saveGuideDismissed } from '../game/onboarding'
 import { discardState, exportSavedState, importSavedState } from '../game/persistence'
 import type { Store } from '../game/store'
 
@@ -52,6 +53,7 @@ export function installUi(store: Store, requestRender: () => void): void {
     // localStorage blocked (private mode) — just show the help.
   }
   const helpOpen = ref(!seen)
+  const guideDismissed = ref(loadGuideDismissed())
   const closeHelp = (): void => {
     helpOpen.value = false
     try {
@@ -87,11 +89,23 @@ export function installUi(store: Store, requestRender: () => void): void {
 
   const blur = (e: Event) => (e.currentTarget as HTMLElement).blur()
 
-  const button = (id: string, label: string, color: number | null): VNode =>
-    h(
+  const guideStep = () => (guideDismissed.value ? null : firstBuildGuideStep(store))
+
+  const dismissGuide = (e: MouseEvent): void => {
+    guideDismissed.value = true
+    saveGuideDismissed(true)
+    blur(e)
+  }
+
+  const button = (id: string, label: string, color: number | null): VNode => {
+    const guide = guideStep()
+    const classes = [a.modeId === id ? 'active' : '', guide?.modeId === id ? 'guide-target' : '']
+      .filter(Boolean)
+      .join(' ')
+    return h(
       'button',
       {
-        class: a.modeId === id ? 'active' : undefined,
+        class: classes || undefined,
         onClick: (e: MouseEvent) => {
           const type = BUILDING_TYPES.find((t) => t.id === id)
           setMode(store, type ? { kind: 'build', type } : { kind: 'select' })
@@ -100,6 +114,7 @@ export function installUi(store: Store, requestRender: () => void): void {
       },
       [color !== null ? h('span', { class: 'dot', style: `background:${cssColor(color)}` }) : null, label],
     )
+  }
 
   // Compact non-negative integer field; commits on change (blur/Enter).
   const numberField = (value: number, onCommit: (v: number) => void): VNode =>
@@ -233,6 +248,22 @@ export function installUi(store: Store, requestRender: () => void): void {
     ])
   }
 
+  const guideBox = (): VNode | null => {
+    const guide = guideStep()
+    if (!guide) {
+      if (!guideDismissed.value) {
+        guideDismissed.value = true
+        saveGuideDismissed(true)
+      }
+      return null
+    }
+    return h('div', { class: 'guide' }, [
+      h('button', { class: 'guide-close', title: 'Ausblenden', onClick: dismissGuide }, '×'),
+      h('b', guide.title),
+      h('div', guide.text),
+    ])
+  }
+
   const App = {
     setup() {
       return () =>
@@ -273,6 +304,7 @@ export function installUi(store: Store, requestRender: () => void): void {
           ]),
           // Town list — below the HUD
           townList(),
+          guideBox(),
           // Notice — top center
           a.notice ? h('div', { class: 'notice' }, a.notice) : null,
           // Info panel — top right

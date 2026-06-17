@@ -27,6 +27,13 @@
         padding: 8px 14px; background: rgba(24,22,30,.9); border: 1px solid #4a4a55;
         border-radius: 8px; }
 
+      .guide { position: fixed; left: 12px; top: 188px; width: 220px; padding: 9px 12px;
+        background: rgba(18,24,28,.9); border: 1px solid #5b9bd5; border-radius: 8px;
+        pointer-events: auto; font-size: 13px; box-shadow: 0 8px 24px rgba(0,0,0,.35); }
+      .guide b { display: block; margin-bottom: 3px; color: #ffe9a8; }
+      .guide-close { position: absolute; top: 5px; right: 6px; padding: 0; width: 20px; height: 20px;
+        justify-content: center; }
+
       .panel { position: fixed; top: 12px; right: 12px; width: 232px; padding: 10px 12px;
         background: rgba(0,0,0,.62); border-radius: 8px; }
       .panel h3 { margin: 0 0 6px; font-size: 14px; }
@@ -60,6 +67,7 @@
         border-radius: 6px; cursor: pointer; font: inherit; font-size: 13px; }
       button:hover { background: rgba(40,46,56,.92); }
       button.active { background: #3a6ea5; border-color: #5b9bd5; }
+      button.guide-target { border-color: #ffe066; box-shadow: 0 0 0 2px rgba(255,224,102,.35); }
       .dot { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
 
       .hud-title { display: flex; align-items: center; gap: 8px; }
