@@ -350,6 +350,36 @@ const STATUS_COLORS: Record<MapStatusKind, string> = {
   storage: '#d8b4fe',
 };
 
+const BUILDING_MARKS: Record<string, string> = {
+  tradingPost: 'K',
+  house: 'W',
+  sawmill: 'S',
+  farm: 'H',
+  mill: 'M',
+  brewery: 'Br',
+  bakery: 'Bk',
+  mine: 'Mi',
+  smithy: 'Sm',
+  shed: 'L',
+};
+
+function drawBuildingTypeMarkers(ctx: CanvasRenderingContext2D, cam: Camera, store: Store): void {
+  if (cam.scale < 36) return;
+  for (const b of store.buildings.byId.values()) {
+    if (b.z !== store.zLevel) continue;
+    const mark = BUILDING_MARKS[b.typeId];
+    if (!mark) continue;
+    const c = triCentroid(b.cells[0].x, b.cells[0].y);
+    const s = Math.max(0.2, mark.length * 0.11 + 0.18);
+    ctx.fillStyle = b.owner === undefined ? 'rgba(8, 10, 14, 0.58)' : 'rgba(8, 10, 14, 0.42)';
+    ctx.fillRect(c.x - s / 2, c.y - s / 2, s, s);
+    ctx.lineWidth = 1 / cam.scale;
+    ctx.strokeStyle = b.owner === undefined ? 'rgba(255, 255, 255, 0.45)' : 'rgba(255, 233, 168, 0.45)';
+    ctx.strokeRect(c.x - s / 2, c.y - s / 2, s, s);
+    drawWorldText(ctx, cam, c.x, c.y, mark, b.owner === undefined ? '#f8fafc' : '#ffe9a8');
+  }
+}
+
 function drawStatusBadges(ctx: CanvasRenderingContext2D, cam: Camera, store: Store): void {
   if (cam.scale < 24) return;
   for (const b of store.buildings.byId.values()) {
@@ -380,6 +410,7 @@ export function drawOverlay(ctx: CanvasRenderingContext2D, cam: Camera, store: S
 
   drawBuildPlanning(ctx, cam, store);
   drawRoutePlanning(ctx, cam, store);
+  drawBuildingTypeMarkers(ctx, cam, store);
   drawStatusBadges(ctx, cam, store);
 
   const ghost = ghostFootprint(store);
