@@ -7,9 +7,11 @@
  * of prebuilt Pixi graphics, it draws per frame (only when the camera has
  * moved). Chunk caching is the later optimization, if needed.
  */
+import { RECIPES, ECON } from '../core/economy';
 import type { Buildings } from '../core/buildings';
-import { hexPolygonFlat, hexTriangles, triToHex } from '../core/hex';
+import { hexCenter, hexDistance, hexPolygonFlat, hexTriangles, triToHex, type HexCoord } from '../core/hex';
 import { settlementTradingPosts } from '../core/npc';
+import { ROUTE } from '../core/routes';
 import { terrainAt, triShadeColor } from '../core/terrain';
 import { ROW_H, SIDE, triCentroid, triVerticesFlat, type TriCoord } from '../core/tri';
 import type { World } from '../core/world';
@@ -52,6 +54,55 @@ function addPoly(ctx: CanvasRenderingContext2D, flat: number[]): void {
 function polyPath(ctx: CanvasRenderingContext2D, flat: number[]): void {
   ctx.beginPath();
   addPoly(ctx, flat);
+}
+
+function hexesInRadius(center: HexCoord, radius: number): HexCoord[] {
+  const result: HexCoord[] = [];
+  for (let dq = -radius; dq <= radius; dq++) {
+    const rMin = Math.max(-radius, -dq - radius);
+    const rMax = Math.min(radius, -dq + radius);
+    for (let dr = rMin; dr <= rMax; dr++) {
+      result.push({ q: center.q + dq, r: center.r + dr });
+    }
+  }
+  return result;
+}
+
+function drawHexRadius(
+  ctx: CanvasRenderingContext2D,
+  center: HexCoord,
+  radius: number,
+  fill: string,
+  stroke: string,
+  line: number,
+): void {
+  const hexes = hexesInRadius(center, radius);
+  ctx.beginPath();
+  for (const h of hexes) addPoly(ctx, hexPolygonFlat(h.q, h.r));
+  ctx.fillStyle = fill;
+  ctx.fill();
+  ctx.lineWidth = line;
+  ctx.strokeStyle = stroke;
+  ctx.stroke();
+}
+
+function drawWorldText(
+  ctx: CanvasRenderingContext2D,
+  cam: Camera,
+  x: number,
+  y: number,
+  text: string,
+  fill: string,
+): void {
+  const size = 12 / cam.scale;
+  ctx.font = `${size}px ui-monospace, Menlo, monospace`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.lineWidth = 3 / cam.scale;
+  ctx.strokeStyle = 'rgba(8, 10, 14, 0.85)';
+  ctx.strokeText(text, x, y);
+  ctx.fillStyle = fill;
+  ctx.fillText(text, x, y);
 }
 
 export function drawMap(ctx: CanvasRenderingContext2D, cam: Camera): void {
@@ -225,6 +276,71 @@ function highlight(
   ctx.stroke();
 }
 
+function drawBuildPlanning(ctx: CanvasRenderingContext2D, cam: Camera, store: Store): void {
+  if (store.mode.kind !== 'build' || !store.hover) return;
+  const hex = triToHex(store.hover.x, store.hover.y);
+  const line = 1 / cam.scale;
+  if (store.mode.type.id === 'tradingPost') {
+    drawHexRadius(
+      ctx,
+      hex,
+      ECON.tradingPostRadius,
+      'rgba(85, 166, 255, 0.09)',
+      'rgba(85, 166, 255, 0.28)',
+      line,
+    );
+    const c = hexCenter(hex.q, hex.r);
+    drawWorldText(ctx, cam, c.x, c.y + ROW_H * (ECON.tradingPostRadius + 1.4), 'Kontor-Reichweite', '#9dccff');
+  } else if (RECIPES[store.mode.type.id]) {
+    drawHexRadius(
+      ctx,
+      hex,
+      ECON.workerRadius,
+      'rgba(255, 209, 102, 0.10)',
+      'rgba(255, 209, 102, 0.34)',
+      line,
+    );
+    const c = hexCenter(hex.q, hex.r);
+    drawWorldText(ctx, cam, c.x, c.y + ROW_H * (ECON.workerRadius + 1.3), 'Arbeiter-Reichweite', '#ffd166');
+  }
+}
+
+function drawRoutePlanning(ctx: CanvasRenderingContext2D, cam: Camera, store: Store): void {
+  if (store.mode.kind !== 'route') return;
+  const line = 2 / cam.scale;
+  if (store.mode.fromId === null) {
+    ctx.lineWidth = line;
+    ctx.strokeStyle = 'rgba(105, 219, 124, 0.8)';
+    for (const b of store.buildings.byId.values()) {
+      if (b.typeId !== 'tradingPost' || b.z !== store.zLevel) continue;
+      polyPath(ctx, triVerticesFlat(b.cells[0].x, b.cells[0].y));
+      ctx.stroke();
+    }
+    return;
+  }
+
+  const from = store.buildings.byId.get(store.mode.fromId);
+  if (!from || from.typeId !== 'tradingPost' || !store.hover) return;
+  const target = store.buildings.at(store.hover.x, store.hover.y, store.zLevel);
+  const fromCenter = triCentroid(from.cells[0].x, from.cells[0].y);
+  const toCell = target?.typeId === 'tradingPost' ? target.cells[0] : store.hover;
+  const toCenter = triCentroid(toCell.x, toCell.y);
+
+  ctx.beginPath();
+  ctx.moveTo(fromCenter.x, fromCenter.y);
+  ctx.lineTo(toCenter.x, toCenter.y);
+  ctx.lineWidth = line;
+  ctx.strokeStyle = target?.typeId === 'tradingPost' ? 'rgba(105, 219, 124, 0.9)' : 'rgba(255, 209, 102, 0.7)';
+  ctx.stroke();
+
+  const a = triToHex(from.cells[0].x, from.cells[0].y);
+  const b = triToHex(toCell.x, toCell.y);
+  const distance = hexDistance(a, b);
+  const ticks = Math.max(1, Math.ceil(distance / ROUTE.hexPerTick));
+  const label = target?.typeId === 'tradingPost' ? `${distance} Hex · ${ticks} Ticks` : `${distance} Hex`;
+  drawWorldText(ctx, cam, (fromCenter.x + toCenter.x) / 2, (fromCenter.y + toCenter.y) / 2, label, '#d9f99d');
+}
+
 /**
  * Interaction overlay: in build mode, the preview (green = buildable, red = not)
  * at the cursor, otherwise selection (yellow) and hover (white) highlights. Cf.
@@ -232,6 +348,9 @@ function highlight(
  */
 export function drawOverlay(ctx: CanvasRenderingContext2D, cam: Camera, store: Store): void {
   const line = 1 / cam.scale;
+
+  drawBuildPlanning(ctx, cam, store);
+  drawRoutePlanning(ctx, cam, store);
 
   const ghost = ghostFootprint(store);
   if (ghost) {
@@ -248,6 +367,10 @@ export function drawOverlay(ctx: CanvasRenderingContext2D, cam: Camera, store: S
     ctx.lineWidth = line;
     ctx.strokeStyle = ghost.ok ? '#69db7c' : '#ff6b6b';
     ctx.stroke();
+    if (!ghost.ok && ghost.reason) {
+      const c = triCentroid(ghost.cells[0].x, ghost.cells[0].y);
+      drawWorldText(ctx, cam, c.x, c.y + 0.55, ghost.reason, '#ffb4b4');
+    }
     return;
   }
 

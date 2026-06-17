@@ -1,28 +1,56 @@
 import { describe, expect, it } from 'vitest'
+import { BUILDING_TYPES } from '../core/buildings'
+import { Buildings } from '../core/buildings'
 import { hexTriangles, triToHex } from '../core/hex'
+import { Routes } from '../core/routes'
 import { pointToTri, triCentroid } from '../core/tri'
+import { World } from '../core/world'
+import type { Store } from '../game/store'
 import { Camera } from './camera'
-import { tierForScale, drawMap } from './map'
+import { tierForScale, drawMap, drawOverlay } from './map'
 
 /** Minimal CanvasRenderingContext2D stand-in that only counts calls. */
 function mockCtx() {
   let fills = 0
   let strokes = 0
+  const texts: string[] = []
   return {
     fillStyle: '',
     strokeStyle: '',
     lineWidth: 0,
+    font: '',
+    textAlign: '',
+    textBaseline: '',
     beginPath() {},
     moveTo() {},
     lineTo() {},
     closePath() {},
     fill() { fills++ },
     stroke() { strokes++ },
+    strokeText(text: string) { texts.push(text) },
+    fillText(text: string) { texts.push(text) },
     setTransform() {},
     fillRect() {},
     get fills() { return fills },
     get strokes() { return strokes },
+    get texts() { return texts },
   }
+}
+
+function testStore(parts: Partial<Store>): Store {
+  const world = new World()
+  const buildings = new Buildings(world)
+  return {
+    world,
+    buildings,
+    routes: new Routes(buildings),
+    zLevel: 0,
+    mode: { kind: 'select' },
+    hover: null,
+    selected: null,
+    selectedBuildingId: null,
+    ...parts,
+  } as Store
 }
 
 describe('Camera', () => {
@@ -100,6 +128,51 @@ describe('drawMap', () => {
     drawMap(ctx as unknown as CanvasRenderingContext2D, cam)
     expect(ctx.fills).toBeGreaterThan(0)
     expect(ctx.fills).toBeLessThanOrEqual(7)
+  })
+})
+
+describe('drawOverlay planning hints', () => {
+  it('draws the trading post collection radius while placing a Kontor', () => {
+    const cam = new Camera()
+    cam.scale = 48
+    const type = BUILDING_TYPES.find((t) => t.id === 'tradingPost')!
+    const store = testStore({ mode: { kind: 'build', type }, hover: { x: 0, y: 0 } })
+    const ctx = mockCtx()
+    drawOverlay(ctx as unknown as CanvasRenderingContext2D, cam, store)
+    expect(ctx.fills).toBeGreaterThan(1) // radius fill + build ghost
+    expect(ctx.texts).toContain('Kontor-Reichweite')
+  })
+
+  it('shows invalid build reasons on the build preview', () => {
+    const cam = new Camera()
+    cam.scale = 48
+    const type = BUILDING_TYPES.find((t) => t.id === 'house')!
+    const store = testStore({ zLevel: 1, mode: { kind: 'build', type }, hover: { x: 0, y: 0 } })
+    const ctx = mockCtx()
+    drawOverlay(ctx as unknown as CanvasRenderingContext2D, cam, store)
+    expect(ctx.texts).toContain('keine tragende Ebene darunter')
+  })
+
+  it('previews route distance and travel ticks while choosing a cart target', () => {
+    const world = new World()
+    const buildings = new Buildings(world)
+    buildings.restore(JSON.stringify({
+      v: 1,
+      buildings: [
+        { id: 1, t: 'tradingPost', z: 0, cells: [[0, 0]] },
+        { id: 2, t: 'tradingPost', z: 0, cells: [[60, 0]] },
+      ],
+    }))
+    const store = testStore({
+      world,
+      buildings,
+      routes: new Routes(buildings),
+      mode: { kind: 'route', fromId: 1 },
+      hover: { x: 60, y: 0 },
+    })
+    const ctx = mockCtx()
+    drawOverlay(ctx as unknown as CanvasRenderingContext2D, new Camera(), store)
+    expect(ctx.texts.some((text) => text.includes('Ticks'))).toBe(true)
   })
 })
 
