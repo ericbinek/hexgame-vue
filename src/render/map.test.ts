@@ -88,6 +88,19 @@ describe('drawMap', () => {
     expect(ctx.fills).toBeGreaterThan(0)
     expect(ctx.strokes).toBe(0) // Tier 0: faces only
   })
+
+  it('bundles faces by terrain color (≤ 7 fills, regardless of hex count)', () => {
+    // A large viewport at far zoom = thousands of hexes. Thanks to color batching
+    // the number of fill() calls must still not exceed the 7 terrain types —
+    // otherwise a fill-per-hex would have crept back in.
+    const cam = new Camera()
+    cam.setViewport(4000, 3000)
+    cam.scale = 8
+    const ctx = mockCtx()
+    drawMap(ctx as unknown as CanvasRenderingContext2D, cam)
+    expect(ctx.fills).toBeGreaterThan(0)
+    expect(ctx.fills).toBeLessThanOrEqual(7)
+  })
 })
 
 describe('picking consistency (geometry ↔ hex)', () => {

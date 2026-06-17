@@ -25,15 +25,33 @@ export function tierForScale(scale: number): Tier {
   return scale >= 48 ? 2 : scale >= 16 ? 1 : 0;
 }
 
-function cssColor(n: number): string {
+function rawCssColor(n: number): string {
   return '#' + (n >>> 0).toString(16).padStart(6, '0');
+}
+
+// Small cache for the finite set of recurring colors (7 terrain types, building
+// colors). Saves thousands of toString(16) allocations per frame. The tier-2
+// shades are quasi-unbounded and deliberately not cached.
+const colorCache = new Map<number, string>();
+function cssColor(n: number): string {
+  let s = colorCache.get(n);
+  if (s === undefined) {
+    s = rawCssColor(n);
+    colorCache.set(n, s);
+  }
+  return s;
+}
+
+/** Sub-path (no beginPath) — to collect many polygons into one path. */
+function addPoly(ctx: CanvasRenderingContext2D, flat: number[]): void {
+  ctx.moveTo(flat[0], flat[1]);
+  for (let i = 2; i < flat.length; i += 2) ctx.lineTo(flat[i], flat[i + 1]);
+  ctx.closePath();
 }
 
 function polyPath(ctx: CanvasRenderingContext2D, flat: number[]): void {
   ctx.beginPath();
-  ctx.moveTo(flat[0], flat[1]);
-  for (let i = 2; i < flat.length; i += 2) ctx.lineTo(flat[i], flat[i + 1]);
-  ctx.closePath();
+  addPoly(ctx, flat);
 }
 
 export function drawMap(ctx: CanvasRenderingContext2D, cam: Camera): void {
@@ -47,33 +65,64 @@ export function drawMap(ctx: CanvasRenderingContext2D, cam: Camera): void {
   const bMin = Math.floor(rect.minY / ROW_H) - 1;
   const bMax = Math.ceil(rect.maxY / ROW_H) + 1;
 
+  if (tier === 2) {
+    // Zoomed in: each triangle has its own shade color (no batch win when
+    // filling), but the outlines can be bundled into a single stroke.
+    const outlines: number[][] = [];
+    for (let a = aMin; a <= aMax; a++) {
+      for (let b = bMin; b <= bMax; b++) {
+        if (((a + b) & 1) !== 0) continue;
+        const terrain = terrainAt((a + b) / 2, (a - b) / 2);
+        for (const tri of hexTriangles((a + b) / 2, (a - b) / 2)) {
+          const flat = triVerticesFlat(tri.x, tri.y);
+          polyPath(ctx, flat);
+          ctx.fillStyle = rawCssColor(triShadeColor(terrain.color, tri));
+          ctx.fill();
+          outlines.push(flat);
+        }
+      }
+    }
+    ctx.beginPath();
+    for (const flat of outlines) addPoly(ctx, flat);
+    ctx.lineWidth = line;
+    ctx.strokeStyle = 'rgba(10, 14, 20, 0.25)';
+    ctx.stroke();
+    return;
+  }
+
+  // Tier 0/1: bundle hex faces by terrain color — instead of one fill() per hex,
+  // a single collected path per color (≤ 7). At tier 1, all outlines in one stroke.
+  const byColor = new Map<number, number[][]>();
   for (let a = aMin; a <= aMax; a++) {
     for (let b = bMin; b <= bMax; b++) {
       if (((a + b) & 1) !== 0) continue;
       const q = (a + b) / 2;
       const r = (a - b) / 2;
-      const terrain = terrainAt(q, r);
-
-      if (tier === 2) {
-        for (const tri of hexTriangles(q, r)) {
-          polyPath(ctx, triVerticesFlat(tri.x, tri.y));
-          ctx.fillStyle = cssColor(triShadeColor(terrain.color, tri));
-          ctx.fill();
-          ctx.lineWidth = line;
-          ctx.strokeStyle = 'rgba(10, 14, 20, 0.25)';
-          ctx.stroke();
-        }
-      } else {
-        polyPath(ctx, hexPolygonFlat(q, r));
-        ctx.fillStyle = cssColor(terrain.color);
-        ctx.fill();
-        if (tier === 1) {
-          ctx.lineWidth = line;
-          ctx.strokeStyle = 'rgba(10, 14, 20, 0.3)';
-          ctx.stroke();
-        }
+      const col = terrainAt(q, r).color;
+      let arr = byColor.get(col);
+      if (!arr) {
+        arr = [];
+        byColor.set(col, arr);
       }
+      arr.push(hexPolygonFlat(q, r));
     }
+  }
+
+  for (const [col, polys] of byColor) {
+    ctx.beginPath();
+    for (const flat of polys) addPoly(ctx, flat);
+    ctx.fillStyle = cssColor(col);
+    ctx.fill();
+  }
+
+  if (tier === 1) {
+    ctx.beginPath();
+    for (const polys of byColor.values()) {
+      for (const flat of polys) addPoly(ctx, flat);
+    }
+    ctx.lineWidth = line;
+    ctx.strokeStyle = 'rgba(10, 14, 20, 0.3)';
+    ctx.stroke();
   }
 }
 
