@@ -11,11 +11,13 @@
 
       /* UI root lets clicks pass through to the map; only the controls catch them. */
       #ui { position: fixed; inset: 0; pointer-events: none; }
-      #ui .toolbar, #ui .speedbar, #ui .panel { pointer-events: auto; }
+      #ui .toolbar, #ui .speedbar, #ui .panel, #ui .hud { pointer-events: auto; }
 
       .hud { position: fixed; top: 12px; left: 12px; padding: 8px 12px;
         background: rgba(0,0,0,.55); border-radius: 8px; }
       .small { opacity: .75; font-size: 12px; }
+      .hud-actions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+      .hud-actions button { padding: 3px 7px; font-size: 12px; }
 
       .notice { position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
         padding: 8px 14px; background: rgba(24,22,30,.9); border: 1px solid #4a4a55;

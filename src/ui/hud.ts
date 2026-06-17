@@ -16,10 +16,12 @@ import {
   setCartReturnGood,
   setMaxOutput,
   setMode,
+  setNotice,
   setSpeed,
   setTradingPostLimit,
   startRouteMode,
 } from '../game/operations'
+import { discardState, exportSavedState, importSavedState } from '../game/persistence'
 import type { Store } from '../game/store'
 
 const SPEEDS = [0, 1, 2, 4] as const
@@ -126,6 +128,31 @@ export function installUi(store: Store, requestRender: () => void): void {
       ],
     )
 
+  const resetSave = (e: MouseEvent): void => {
+    blur(e)
+    if (!window.confirm('Lokalen Spielstand wirklich löschen?')) return
+    discardState()
+    window.location.reload()
+  }
+
+  const exportSave = (e: MouseEvent): void => {
+    blur(e)
+    window.prompt('Spielstand JSON kopieren:', exportSavedState(store.buildings, store.routes, store.treasury))
+    setNotice(store, 'Export bereit')
+  }
+
+  const importSave = (e: MouseEvent): void => {
+    blur(e)
+    const json = window.prompt('Spielstand JSON einfügen:')
+    if (!json) return
+    const result = importSavedState(json)
+    if (!result.ok) {
+      setNotice(store, `Import: ${result.reason}`)
+      return
+    }
+    window.location.reload()
+  }
+
   const panel = (): VNode | null => {
     const sel = a.selection
     if (!sel) return null
@@ -227,6 +254,11 @@ export function installUi(store: Store, requestRender: () => void): void {
             ),
             h('div', { class: 'small' }, `${a.towns} Orte · ${a.buildings} Gebäude`),
             h('div', { class: 'small' }, `Hex (${a.q}, ${a.r}) · ${a.terrain}${a.place ? ' · ' + a.place : ''}`),
+            h('div', { class: 'hud-actions' }, [
+              h('button', { title: 'Spielstand exportieren', onClick: exportSave }, 'Export'),
+              h('button', { title: 'Spielstand importieren', onClick: importSave }, 'Import'),
+              h('button', { title: 'Lokalen Spielstand löschen', onClick: resetSave }, 'Reset'),
+            ]),
           ]),
           // Town list — below the HUD
           townList(),
