@@ -7,6 +7,7 @@ import { save, discardState } from './game/persistence'
 import { updateSelection, clickMap, setMode, setNotice, setSpeed } from './game/operations'
 import { createStore, tickOnce } from './game/store'
 import { drawMap, drawLabels, drawObjects, drawOverlay } from './render/map'
+import { RenderProfiler } from './render/profile'
 import { installUi } from './ui/hud'
 
 // --- Store + Canvas ---------------------------------------------------------
@@ -16,6 +17,7 @@ const a = store.display
 
 const canvas = document.getElementById('map') as HTMLCanvasElement
 const ctx = canvas.getContext('2d')!
+const renderProfiler = new RenderProfiler(new URLSearchParams(location.search).has('profile'))
 let dirty = true
 
 // Start over a settlement — the NPC villages sit far from the origin.
@@ -42,16 +44,18 @@ function triUnder(sx: number, sy: number): TriCoord {
 }
 
 function render() {
-  const dpr = window.devicePixelRatio || 1
-  ctx.setTransform(1, 0, 0, 1, 0, 0)
-  ctx.fillStyle = '#0c1622' // deep water as background
-  ctx.fillRect(0, 0, canvas.width, canvas.height)
-  cam.applyToCanvas(ctx, dpr)
-  drawMap(ctx, cam) // terrain
-  drawObjects(ctx, cam, store.world, store.zLevel) // buildings
-  drawOverlay(ctx, cam, store) // preview / selection / hover
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0) // screen space for text
-  drawLabels(ctx, cam, store.buildings) // settlement names
+  renderProfiler.measure('total', () => {
+    const dpr = window.devicePixelRatio || 1
+    ctx.setTransform(1, 0, 0, 1, 0, 0)
+    ctx.fillStyle = '#0c1622' // deep water as background
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    cam.applyToCanvas(ctx, dpr)
+    renderProfiler.measure('terrain', () => drawMap(ctx, cam))
+    renderProfiler.measure('objects', () => drawObjects(ctx, cam, store.world, store.zLevel))
+    renderProfiler.measure('overlay', () => drawOverlay(ctx, cam, store))
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0) // screen space for text
+    renderProfiler.measure('labels', () => drawLabels(ctx, cam, store.buildings))
+  })
 }
 
 // --- Render/tick loop -------------------------------------------------------
@@ -206,6 +210,12 @@ installUi(store, () => {
 // Debug access for console/smoke test (cf. window.__hexgame in original/).
 ;(window as unknown as { __hexgame: unknown }).__hexgame = {
   store,
+  renderProfile: () => renderProfiler.summary(),
+  resetRenderProfile: () => renderProfiler.reset(),
+  setRenderProfiling(enabled: boolean): void {
+    renderProfiler.enabled = enabled
+    renderProfiler.reset()
+  },
   /** Builds typeId at triangle (x,y) through the real click path. */
   build(typeId: string, x: number, y: number): boolean {
     const type = typeById(typeId)
