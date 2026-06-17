@@ -16,9 +16,9 @@ import { Routes, type Treasury } from '../core/routes'
 import type { TriCoord } from '../core/tri'
 import { World } from '../core/world'
 import { Camera } from '../render/camera'
+import { START_GELD } from './constants'
+import { loadObjectiveCompletions, updateObjectives, type ObjectiveId, type ObjectiveProgress } from './objectives'
 import { loadState } from './persistence'
-
-export const START_GELD = 500
 
 /** What a click on the map does. */
 export type Mode =
@@ -81,6 +81,7 @@ export interface Display {
   modeId: string // 'select' or BuildingType.id — for the build toolbar highlight
   notice: string
   selection: SelectionInfo | null
+  objectives: ObjectiveProgress[]
 }
 
 export interface Store {
@@ -98,6 +99,7 @@ export interface Store {
   hover: TriCoord | null
   selected: TriCoord | null
   selectedBuildingId: number | null
+  objectiveCompleted: Set<ObjectiveId>
   readonly display: Display
 }
 
@@ -134,9 +136,10 @@ export function createStore(): Store {
     modeId: 'select',
     notice: '',
     selection: null,
+    objectives: [],
   })
 
-  return {
+  const store: Store = {
     world,
     buildings,
     economy,
@@ -150,8 +153,11 @@ export function createStore(): Store {
     hover: null,
     selected: null,
     selectedBuildingId: null,
+    objectiveCompleted: loadObjectiveCompletions(),
     display,
   }
+  updateObjectives(store)
+  return store
 }
 
 /** Updates the reactive counters (money/buildings/towns) from the sim state. */
@@ -159,6 +165,7 @@ export function updateCounters(store: Store): void {
   store.display.money = store.treasury.money
   store.display.buildings = store.buildings.byId.size
   store.display.towns = countTowns(store.buildings)
+  updateObjectives(store)
 }
 
 /**
@@ -177,6 +184,7 @@ export function tickOnce(store: Store): boolean {
 
   store.display.money = store.treasury.money
   store.display.tick = store.economy.tickCount
+  updateObjectives(store)
   if (buildingsChanged) {
     store.display.buildings = store.buildings.byId.size
     store.display.towns = countTowns(store.buildings)

@@ -259,6 +259,17 @@ export function installUi(store: Store, requestRender: () => void): void {
               h('button', { title: 'Spielstand importieren', onClick: importSave }, 'Import'),
               h('button', { title: 'Lokalen Spielstand löschen', onClick: resetSave }, 'Reset'),
             ]),
+            h(
+              'div',
+              { class: 'objectives' },
+              a.objectives.map((o) =>
+                h(
+                  'div',
+                  { class: o.completed ? 'done' : o.current ? 'current' : undefined },
+                  `${o.completed ? '✓' : o.current ? '→' : '·'} ${o.label}`,
+                ),
+              ),
+            ),
           ]),
           // Town list — below the HUD
           townList(),

@@ -71,6 +71,7 @@ export function clickMap(store: Store, tri: TriCoord): boolean {
     if (res.ok) {
       setNotice(store, `Wagen gebaut: #${mode.fromId} → #${b.id} (Fracht im Kontor-Panel wählbar)`)
       store.mode = { kind: 'route', fromId: null }
+      updateCounters(store)
       persist(store)
       if (store.selectedBuildingId !== null) updateSelection(store)
     } else {
