@@ -222,6 +222,33 @@ describe('drawOverlay planning hints', () => {
     drawOverlay(readable as unknown as CanvasRenderingContext2D, readableCam, store)
     expect(readable.texts).toContain('K')
   })
+
+  it('draws active route cart labels with load and direction', () => {
+    const world = new World()
+    const buildings = new Buildings(world)
+    buildings.restore(JSON.stringify({
+      v: 1,
+      buildings: [
+        { id: 1, t: 'tradingPost', z: 0, cells: [[0, 0]], inv: { beer: 8 } },
+        { id: 2, t: 'tradingPost', z: 0, cells: [[60, 0]], o: 'Eldwik' },
+      ],
+    }))
+    const routes = new Routes(buildings)
+    const res = routes.create(1, 2, 'beer')
+    if (!res.ok) throw new Error(res.reason)
+    routes.tick()
+    const store = testStore({
+      world,
+      buildings,
+      economy: new Economy(buildings),
+      routes,
+    })
+    const ctx = mockCtx()
+    const cam = new Camera()
+    cam.scale = 48
+    drawOverlay(ctx as unknown as CanvasRenderingContext2D, cam, store)
+    expect(ctx.texts).toContain('→ 8 Bier')
+  })
 })
 
 describe('picking consistency (geometry ↔ hex)', () => {

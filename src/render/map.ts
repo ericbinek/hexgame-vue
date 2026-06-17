@@ -7,7 +7,7 @@
  * of prebuilt Pixi graphics, it draws per frame (only when the camera has
  * moved). Chunk caching is the later optimization, if needed.
  */
-import { RECIPES, ECON } from '../core/economy';
+import { RECIPES, ECON, GOODS } from '../core/economy';
 import type { Buildings } from '../core/buildings';
 import { hexCenter, hexDistance, hexPolygonFlat, hexTriangles, triToHex, type HexCoord } from '../core/hex';
 import { settlementTradingPosts } from '../core/npc';
@@ -342,6 +342,49 @@ function drawRoutePlanning(ctx: CanvasRenderingContext2D, cam: Camera, store: St
   drawWorldText(ctx, cam, (fromCenter.x + toCenter.x) / 2, (fromCenter.y + toCenter.y) / 2, label, '#d9f99d');
 }
 
+function lerp(a: number, b: number, t: number): number {
+  return a + (b - a) * Math.max(0, Math.min(1, t));
+}
+
+function drawActiveRoutes(ctx: CanvasRenderingContext2D, cam: Camera, store: Store): void {
+  const line = 2 / cam.scale;
+  for (const cart of store.routes.byId.values()) {
+    const from = store.buildings.byId.get(cart.fromId);
+    const to = store.buildings.byId.get(cart.toId);
+    if (!from || !to || from.typeId !== 'tradingPost' || to.typeId !== 'tradingPost') continue;
+    const a = triCentroid(from.cells[0].x, from.cells[0].y);
+    const b = triCentroid(to.cells[0].x, to.cells[0].y);
+    const foreign = from.owner !== undefined || to.owner !== undefined;
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.lineWidth = line;
+    ctx.strokeStyle = foreign ? 'rgba(255, 209, 102, 0.58)' : 'rgba(145, 200, 255, 0.58)';
+    ctx.stroke();
+
+    const travel = store.routes.travelTicksOf(cart);
+    const outbound = cart.phase === 'outbound' || cart.phase === 'unloadOut';
+    const returning = cart.phase === 'returnTrip' || cart.phase === 'unloadReturn' || cart.phase === 'loadReturn';
+    let t = outbound ? 1 - cart.ticksLeft / travel : returning ? cart.ticksLeft / travel : 0;
+    if (cart.phase === 'unloadOut' || cart.phase === 'loadReturn') t = 1;
+    if (cart.phase === 'unloadReturn' || cart.phase === 'loadOut') t = 0;
+    const x = lerp(a.x, b.x, t);
+    const y = lerp(a.y, b.y, t);
+    const size = 0.16;
+    ctx.fillStyle = cart.load > 0 ? (foreign ? '#ffd166' : '#91c8ff') : 'rgba(8, 10, 14, 0.85)';
+    ctx.fillRect(x - size / 2, y - size / 2, size, size);
+    ctx.lineWidth = 1.5 / cam.scale;
+    ctx.strokeStyle = cart.load > 0 ? '#0a0e14' : (foreign ? '#ffd166' : '#91c8ff');
+    ctx.strokeRect(x - size / 2, y - size / 2, size, size);
+
+    if (cam.scale >= 24) {
+      const dir = returning ? '←' : outbound ? '→' : '•';
+      const loadText = cart.load > 0 ? `${cart.load} ${GOODS[cart.loadGood ?? cart.outGood] ?? cart.loadGood ?? cart.outGood}` : 'leer';
+      drawWorldText(ctx, cam, x, y + 0.36, `${dir} ${loadText}`, cart.load > 0 ? '#fff4bf' : '#cbd5e1');
+    }
+  }
+}
+
 const STATUS_COLORS: Record<MapStatusKind, string> = {
   maintenance: '#ff8787',
   workers: '#91c8ff',
@@ -410,6 +453,7 @@ export function drawOverlay(ctx: CanvasRenderingContext2D, cam: Camera, store: S
 
   drawBuildPlanning(ctx, cam, store);
   drawRoutePlanning(ctx, cam, store);
+  drawActiveRoutes(ctx, cam, store);
   drawBuildingTypeMarkers(ctx, cam, store);
   drawStatusBadges(ctx, cam, store);
 
